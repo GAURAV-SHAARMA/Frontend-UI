@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finova Finance Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500;700&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="shell">
+    <div class="sidebar-space"></div>
+    <div id="sidebar-overlay" class="overlay hidden"></div>
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">
+        <h1>FINOVA</h1>
+        <p>Finance Terminal</p>
+      </div>
+      <div class="sidebar-block">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span class="tiny">Net</span>
+          <span id="net-mini" class="mono"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span class="tiny" style="letter-spacing:0;">IN</span>
+          <span id="income-mini" class="mono"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span class="tiny" style="letter-spacing:0;">OUT</span>
+          <span id="expense-mini" class="mono"></span>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="tiny" style="padding:8px 10px 6px;">Navigation</div>
+        <button data-page="dashboard"><span class="mono">OV</span><span>Overview</span><span></span></button>
+        <button data-page="transactions"><span class="mono">TX</span><span>Transactions</span><span></span></button>
+        <button data-page="insights"><span class="mono">IN</span><span>Insights</span><span></span></button>
+      </nav>
+      <div class="sidebar-block" style="border-bottom:0;border-top:1px solid var(--border);margin-top:auto;">
+        <div class="tiny" style="margin-bottom:8px;">Access Role</div>
+        <select id="role-select">
+          <option value="admin">Admin (full access)</option>
+          <option value="viewer">Viewer (read-only)</option>
+        </select>
+        <div id="role-note" style="margin-top:8px;padding:4px 8px;border-radius:5px;border:1px solid transparent;"
+          class="mono"></div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="topbar">
+        <div class="topbar-row">
+          <button id="menu-btn" class="menu-btn">||</button>
+          <div>
+            <h2 id="page-title">Overview</h2>
+            <p id="page-date"></p>
+          </div>
+        </div>
+        <div class="topbar-row">
+          <button id="new-entry-btn" class="btn primary">+ New Entry</button>
+          <button id="export-btn" class="btn">Export</button>
+          <div id="top-role" class="role-badge"></div>
+        </div>
+      </div>
+      <section id="dashboard-page" class="page"></section>
+      <section id="transactions-page" class="page hidden"></section>
+      <section id="insights-page" class="page hidden"></section>
+    </main>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <script>
+    const CATEGORIES = {
+      salary: { label: "Salary", icon: "IN", color: "#22c55e" },
+      freelance: { label: "Freelance", icon: "FL", color: "#3b82f6" },
+      investment: { label: "Investment", icon: "IV", color: "#f5a623" },
+      rent: { label: "Rent", icon: "RT", color: "#ef4444" },
+      food: { label: "Food", icon: "FD", color: "#f97316" },
+      transport: { label: "Transport", icon: "TR", color: "#a855f7" },
+      utilities: { label: "Utilities", icon: "UT", color: "#06b6d4" },
+      shopping: { label: "Shopping", icon: "SP", color: "#ec4899" },
+      health: { label: "Health", icon: "HL", color: "#10b981" },
+      entertainment: { label: "Entertainment", icon: "EN", color: "#f59e0b" },
+      other: { label: "Other", icon: "OT", color: "#8b8984" }
+    };
+
+    const SEED_TX = [
+      { id: 1, name: "Monthly Salary", type: "income", category: "salary", amount: 85000, date: "2025-03-01", note: "March credit" },
+      { id: 2, name: "Apartment Rent", type: "expense", category: "rent", amount: 18000, date: "2025-03-03", note: "" },
+      { id: 3, name: "Freelance Project", type: "income", category: "freelance", amount: 22000, date: "2025-03-05", note: "Website redesign" },
+      { id: 4, name: "Grocery Shopping", type: "expense", category: "food", amount: 4200, date: "2025-03-07", note: "Monthly groceries" },
+      { id: 5, name: "Uber Rides", type: "expense", category: "transport", amount: 1800, date: "2025-03-09", note: "" },
+      { id: 6, name: "Netflix & Spotify", type: "expense", category: "entertainment", amount: 1100, date: "2025-03-10", note: "Subscriptions" },
+      { id: 7, name: "Dividend Income", type: "income", category: "investment", amount: 5400, date: "2025-03-12", note: "Q1 dividend" },
+      { id: 8, name: "Electricity Bill", type: "expense", category: "utilities", amount: 2300, date: "2025-03-14", note: "" },
+      { id: 9, name: "Online Shopping", type: "expense", category: "shopping", amount: 6700, date: "2025-03-16", note: "Clothes & gadgets" },
+      { id: 10, name: "Doctor Visit", type: "expense", category: "health", amount: 1500, date: "2025-03-18", note: "Checkup" },
+      { id: 11, name: "Monthly Salary", type: "income", category: "salary", amount: 85000, date: "2025-02-01", note: "February salary" },
+      { id: 12, name: "Apartment Rent", type: "expense", category: "rent", amount: 18000, date: "2025-02-03", note: "" },
+      { id: 13, name: "Freelance Project", type: "income", category: "freelance", amount: 15000, date: "2025-02-10", note: "App UI design" },
+      { id: 14, name: "Grocery Shopping", type: "expense", category: "food", amount: 3800, date: "2025-02-12", note: "" },
+      { id: 15, name: "Weekend Dining", type: "expense", category: "food", amount: 2100, date: "2025-02-15", note: "" },
+      { id: 16, name: "SIP Investment", type: "expense", category: "investment", amount: 10000, date: "2025-02-20", note: "Mutual fund SIP" },
+      { id: 17, name: "Side Project Rev", type: "income", category: "other", amount: 8000, date: "2025-02-22", note: "" },
+      { id: 18, name: "Shopping", type: "expense", category: "shopping", amount: 4300, date: "2025-02-25", note: "Amazon order" },
+      { id: 19, name: "Monthly Salary", type: "income", category: "salary", amount: 85000, date: "2025-01-01", note: "January salary" },
+      { id: 20, name: "New Laptop", type: "expense", category: "shopping", amount: 55000, date: "2025-01-05", note: "MacBook Pro" },
+      { id: 21, name: "Apartment Rent", type: "expense", category: "rent", amount: 18000, date: "2025-01-06", note: "" },
+      { id: 22, name: "Gym Membership", type: "expense", category: "health", amount: 2500, date: "2025-01-10", note: "Annual membership" },
+      { id: 23, name: "Freelance Work", type: "income", category: "freelance", amount: 18000, date: "2025-01-15", note: "" },
+      { id: 24, name: "Utilities Bundle", type: "expense", category: "utilities", amount: 3100, date: "2025-01-18", note: "" }
+    ];
+
+    const TREND = [
+      { m: "Oct", income: 98200, expense: 44800 },
+      { m: "Nov", income: 97400, expense: 44100 },
+      { m: "Dec", income: 98900, expense: 45600 },
+      { m: "Jan", income: 97800, expense: 44700 },
+      { m: "Feb", income: 98400, expense: 45200 },
+      { m: "Mar", income: 97900, expense: 44500 }
+    ];
+
+    const state = {
+      transactions: load("finova_plain_v1", SEED_TX),
+      role: load("finova_plain_role_v1", "admin"),
+      page: "dashboard",
+      sortCol: "date",
+      sortDir: -1,
+      charts: {}
+    };
+
+    function load(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function save(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch { }
+    }
+
+    function fmt(n) { return "INR " + Math.abs(n).toLocaleString("en-IN"); }
+    function fmtK(n) { return n >= 100000 ? "INR " + (n / 100000).toFixed(1) + "L" : n >= 1000 ? "INR " + (n / 1000).toFixed(1) + "K" : "INR " + n; }
+    function pct(a, b) { return b ? ((a / b) * 100).toFixed(1) + "%" : "0%"; }
+
+    function totals() {
+      const income = state.transactions.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+      const expense = state.transactions.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+      return { income, expense, balance: income - expense, savingsRate: income ? ((income - expense) / income * 100).toFixed(1) : "0.0" };
+    }
+
+    function toast(msg, icon) {
+      const root = document.getElementById("toast-root");
+      root.innerHTML = `<div class="toast"><span>${icon}</span><span>${msg}</span></div>`;
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => { root.innerHTML = ""; }, 2600);
+    }
+
+    function updateRoleUI() {
+      const roleNote = document.getElementById("role-note");
+      const topRole = document.getElementById("top-role");
+      const newEntryBtn = document.getElementById("new-entry-btn");
+      document.getElementById("role-select").value = state.role;
+
+      if (state.role === "admin") {
+        roleNote.textContent = "ADMIN - edit enabled";
+        roleNote.style.background = "rgba(245,166,35,0.12)";
+        roleNote.style.borderColor = "rgba(245,166,35,0.2)";
+        roleNote.style.color = "#f5a623";
+        topRole.textContent = "ADMIN";
+        topRole.style.background = "rgba(245,166,35,0.12)";
+        topRole.style.color = "#f5a623";
+        newEntryBtn.classList.remove("hidden");
+      } else {
+        roleNote.textContent = "VIEWER - read-only";
+        roleNote.style.background = "rgba(59,130,246,0.12)";
+        roleNote.style.borderColor = "rgba(59,130,246,0.2)";
+        roleNote.style.color = "#3b82f6";
+        topRole.textContent = "VIEWER";
+        topRole.style.background = "rgba(59,130,246,0.12)";
+        topRole.style.color = "#3b82f6";
+        newEntryBtn.classList.add("hidden");
+      }
+    }
+
+    function updateSidebarStats() {
+      const t = totals();
+      const netEl = document.getElementById("net-mini");
+      netEl.textContent = fmtK(t.balance);
+      netEl.style.color = t.balance >= 0 ? "#22c55e" : "#ef4444";
+      document.getElementById("income-mini").textContent = "+" + fmtK(t.income);
+      document.getElementById("income-mini").style.color = "#22c55e";
+      document.getElementById("expense-mini").textContent = "-" + fmtK(t.expense);
+      document.getElementById("expense-mini").style.color = "#ef4444";
+    }
+
+    function setPage(page) {
+      state.page = page;
+      document.getElementById("page-title").textContent = page === "dashboard" ? "Overview" : page === "transactions" ? "Transactions" : "Insights";
+      document.getElementById("dashboard-page").classList.toggle("hidden", page !== "dashboard");
+      document.getElementById("transactions-page").classList.toggle("hidden", page !== "transactions");
+      document.getElementById("insights-page").classList.toggle("hidden", page !== "insights");
+      document.querySelectorAll(".nav button").forEach(btn => btn.classList.toggle("active", btn.dataset.page === page));
+      closeSidebar();
+    }
+
+    function openSidebar() {
+      document.getElementById("sidebar").classList.add("open");
+      document.getElementById("sidebar-overlay").classList.remove("hidden");
+    }
+
+    function closeSidebar() {
+      document.getElementById("sidebar").classList.remove("open");
+      document.getElementById("sidebar-overlay").classList.add("hidden");
+    }
+
+    function destroyChart(name) {
+      if (state.charts[name]) {
+        state.charts[name].destroy();
+        state.charts[name] = null;
+      }
+    }
+
+    function statCard(label, value, icon, accent, sub, trend) {
+      const chip = trend ? `<span class="chip" style="background:${trend.startsWith("-") ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.12)"};color:${trend.startsWith("-") ? "#ef4444" : "#22c55e"};">${trend.startsWith("-") ? "" : "+"}${trend}%</span>` : "";
+      return `<div class="card stat" style="--accent:${accent}">
+        <div class="stat-label"><span class="icon">${icon}</span><span class="text">${label}</span></div>
+        <div class="stat-value">${value}</div>
+        <div class="stat-sub">${chip}<span class="subtext">${sub}</span></div>
+      </div>`;
+    }
+
+    function chartOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: legendOff(),
+        scales: {
+          x: { ticks: { color: "#4a4946", font: { family: "'IBM Plex Mono', monospace", size: 10 } }, grid: { color: "#252529" } },
+          y: { ticks: { color: "#4a4946", font: { family: "'IBM Plex Mono', monospace", size: 10 }, callback: (value) => fmtK(value) }, grid: { color: "#252529" } }
+        }
+      };
+    }
+
+    function legendOff() {
+      return {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#18181c",
+          borderColor: "#35353c",
+          borderWidth: 1,
+          titleColor: "#8b8984",
+          bodyColor: "#f2f0ec",
+          titleFont: { family: "'IBM Plex Mono', monospace", size: 11 },
+          bodyFont: { family: "'IBM Plex Mono', monospace", size: 11 }
+        }
+      };
+    }
+
+    function renderDashboard() {
+      const { income, expense, balance, savingsRate } = totals();
+      const expenseMap = {};
+      state.transactions.filter(t => t.type === "expense").forEach(t => { expenseMap[t.category] = (expenseMap[t.category] || 0) + t.amount; });
+      const spendMix = Object.entries(expenseMap).map(([k, v]) => ({ label: CATEGORIES[k]?.label || k, value: v, color: CATEGORIES[k]?.color || "#8b8984" })).sort((a, b) => b.value - a.value);
+
+      document.getElementById("dashboard-page").innerHTML = `
+        <div class="grid-kpi">
+          ${statCard("Net Balance", fmtK(balance), "NB", "#f5a623", "of all time", "12.4")}
+          ${statCard("Total Income", fmtK(income), "IN", "#22c55e", "across all records", "8.1")}
+          ${statCard("Total Expenses", fmtK(expense), "EX", "#ef4444", "across all records", "-4.2")}
+          ${statCard("Savings Rate", savingsRate + "%", "SV", "#3b82f6", "income saved", "")}
+        </div>
+        <div class="grid-two">
+          <div class="card section">
+            <div class="section-head"><div><h3>Monthly Cash Flow</h3><p>income - expense - 6 months</p></div></div>
+            <div class="chart-box lg"><canvas id="cashflow-chart"></canvas></div>
+            <div class="legend">
+              <span><i class="dot" style="background:#22c55e"></i>Income</span>
+              <span><i class="dot" style="background:#ef4444"></i>Expense</span>
+            </div>
+          </div>
+          <div class="card section">
+            <div class="section-head"><div><h3>Spend Mix</h3><p>by category</p></div></div>
+            <div class="chart-box sm"><canvas id="spend-chart"></canvas></div>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+              ${spendMix.slice(0, 5).map(c => `<div style="display:flex;align-items:center;gap:7px;"><div style="width:8px;height:8px;border-radius:2px;background:${c.color};flex-shrink:0;"></div><span class="mono" style="font-size:10px;color:#8b8984;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.label}</span><span class="mono" style="font-size:10px;">${pct(c.value, expense)}</span></div>`).join("")}
+            </div>
+          </div>
+        </div>
+        <div class="card section">
+          <div class="section-head">
+            <div><h3>Net Savings Trend</h3><p>income minus expenses</p></div>
+            <div class="mono" style="font-size:13px;color:#f5a623;font-weight:600;">${fmtK(TREND[TREND.length - 1].income - TREND[TREND.length - 1].expense)} this month</div>
+          </div>
+          <div class="chart-box md"><canvas id="trend-chart"></canvas></div>
+        </div>
+      `;
+
+      destroyChart("cashflow");
+      destroyChart("spend");
+      destroyChart("trend");
+
+      state.charts.cashflow = new Chart(document.getElementById("cashflow-chart"), {
+        type: "bar",
+        data: {
+          labels: TREND.map(t => t.m),
+          datasets: [
+            { label: "Income", data: TREND.map(t => t.income), backgroundColor: "rgba(34,197,94,0.78)", borderRadius: 4, barThickness: 18 },
+            { label: "Expense", data: TREND.map(t => t.expense), backgroundColor: "rgba(239,68,68,0.72)", borderRadius: 4, barThickness: 18 }
+          ]
+        },
+        options: chartOptions()
+      });
+
+      state.charts.spend = new Chart(document.getElementById("spend-chart"), {
+        type: "doughnut",
+        data: { labels: spendMix.map(c => c.label), datasets: [{ data: spendMix.map(c => c.value), backgroundColor: spendMix.map(c => c.color), borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: legendOff() }
+      });
+
+      state.charts.trend = new Chart(document.getElementById("trend-chart"), {
+        type: "bar",
+        data: {
+          labels: TREND.map(t => t.m),
+          datasets: [
+            { label: "Income", data: TREND.map(t => t.income), backgroundColor: "rgba(34,197,94,0.8)", borderRadius: 3 },
+            { label: "Expense", data: TREND.map(t => t.expense), backgroundColor: "rgba(239,68,68,0.8)", borderRadius: 3 }
+          ]
+        },
+        options: chartOptions()
+      });
+    }
+
+    function filteredRows() {
+      const search = document.getElementById("search-input")?.value.toLowerCase() || "";
+      const type = document.body.dataset.typeFilter || "all";
+      const cat = document.body.dataset.catFilter || "all";
+
+      return [...state.transactions]
+        .filter(t => (type === "all" || t.type === type) && (cat === "all" || t.category === cat) && (!search || t.name.toLowerCase().includes(search)))
+        .sort((a, b) => {
+          if (state.sortCol === "date") return state.sortDir * (new Date(a.date) - new Date(b.date));
+          if (state.sortCol === "amount") return state.sortDir * (a.amount - b.amount);
+          if (state.sortCol === "name") return state.sortDir * a.name.localeCompare(b.name);
+          return 0;
+        });
+    }
+
+    function rowHtml(t, canEdit) {
+      const cat = CATEGORIES[t.category] || CATEGORIES.other;
+      return `<tr>
+        <td><span class="mono muted" style="font-size:11px;">${t.date}</span></td>
+        <td><div>${escapeHtml(t.name)}</div>${t.note ? `<div class="note">${escapeHtml(t.note)}</div>` : ""}</td>
+        <td class="hide-sm"><span class="cat-pill" style="color:${cat.color};background:${cat.color}18;border:1px solid ${cat.color}33;">${cat.icon} ${cat.label}</span></td>
+        <td><span class="type-pill" style="color:${t.type === "income" ? "#22c55e" : "#ef4444"};background:${t.type === "income" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)"};">${t.type}</span></td>
+        <td style="text-align:right;"><span class="mono" style="font-size:13px;font-weight:600;color:${t.type === "income" ? "#22c55e" : "#ef4444"};">${t.type === "income" ? "+" : "-"}${fmt(t.amount)}</span></td>
+        ${canEdit ? `<td style="text-align:right;"><div style="display:flex;gap:6px;justify-content:flex-end;"><button class="btn sm" data-edit="${t.id}">Edit</button><button class="btn sm danger" data-delete="${t.id}">Delete</button></div></td>` : ""}
+      </tr>`;
+    }
+
+    function renderTransactions() {
+      const rows = filteredRows();
+      const canEdit = state.role === "admin";
+      document.getElementById("transactions-page").innerHTML = `
+        <div class="card">
+          <div class="table-head">
+            <div><h3>Transactions</h3><p>${rows.length} of ${state.transactions.length} records</p></div>
+            ${canEdit ? `<button id="tx-new-btn" class="btn primary">+ New</button>` : ""}
+          </div>
+          <div class="filters">
+            <div class="grow"><input id="search-input" placeholder="Search transactions..." value="${escapeHtml(document.getElementById("search-input")?.value || "")}" /></div>
+            <div><select id="type-filter"><option value="all">All Types</option><option value="income">Income</option><option value="expense">Expense</option></select></div>
+            <div><select id="cat-filter"><option value="all">All Categories</option>${Object.entries(CATEGORIES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}</select></div>
+          </div>
+          <div class="table-wrap">
+            ${rows.length ? `
+              <table>
+                <thead>
+                  <tr>
+                    <th class="sortable" data-sort="date">Date ${state.sortCol === "date" ? (state.sortDir === -1 ? "v" : "^") : ""}</th>
+                    <th class="sortable" data-sort="name">Description ${state.sortCol === "name" ? (state.sortDir === -1 ? "v" : "^") : ""}</th>
+                    <th class="hide-sm">Category</th>
+                    <th>Type</th>
+                    <th class="sortable" data-sort="amount" style="text-align:right;">Amount ${state.sortCol === "amount" ? (state.sortDir === -1 ? "v" : "^") : ""}</th>
+                    ${canEdit ? `<th style="text-align:right;">Actions</th>` : ""}
+                  </tr>
+                </thead>
+                <tbody>${rows.map(t => rowHtml(t, canEdit)).join("")}</tbody>
+              </table>
+            ` : `<div class="empty"><strong>NO</strong><p class="mono muted" style="font-size:12px;">No transactions match your filters</p></div>`}
+          </div>
+        </div>
+        ${canEdit ? "" : `<div class="viewer-banner">Viewer mode active - switch to Admin in the sidebar to add or edit transactions</div>`}
+      `;
+
+      document.getElementById("type-filter").value = document.body.dataset.typeFilter || "all";
+      document.getElementById("cat-filter").value = document.body.dataset.catFilter || "all";
+
+      document.getElementById("search-input").addEventListener("input", renderTransactions);
+      document.getElementById("type-filter").addEventListener("change", (e) => { document.body.dataset.typeFilter = e.target.value; renderTransactions(); });
+      document.getElementById("cat-filter").addEventListener("change", (e) => { document.body.dataset.catFilter = e.target.value; renderTransactions(); });
+      document.querySelectorAll("[data-sort]").forEach(th => th.addEventListener("click", () => {
+        const col = th.dataset.sort;
+        if (state.sortCol === col) state.sortDir *= -1;
+        else { state.sortCol = col; state.sortDir = -1; }
+        renderTransactions();
+      }));
+      document.querySelectorAll("[data-edit]").forEach(btn => btn.addEventListener("click", () => openModal(Number(btn.dataset.edit))));
+      document.querySelectorAll("[data-delete]").forEach(btn => btn.addEventListener("click", () => {
+        state.transactions = state.transactions.filter(t => t.id !== Number(btn.dataset.delete));
+        persistAndRender();
+        toast("Transaction deleted", "DL");
+      }));
+      const txNewBtn = document.getElementById("tx-new-btn");
+      if (txNewBtn) txNewBtn.addEventListener("click", () => openModal());
+    }
+
+    function renderInsights() {
+      const expense = state.transactions.filter(t => t.type === "expense");
+      const income = state.transactions.filter(t => t.type === "income");
+      const totalExp = expense.reduce((s, t) => s + t.amount, 0);
+      const totalInc = income.reduce((s, t) => s + t.amount, 0);
+      const net = totalInc - totalExp;
+      const sr = totalInc ? ((net / totalInc) * 100).toFixed(1) : "0.0";
+
+      const catMap = {};
+      expense.forEach(t => { catMap[t.category] = (catMap[t.category] || 0) + t.amount; });
+      const sortedCats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+      const topCat = sortedCats[0];
+      const monthMap = {};
+      state.transactions.forEach(t => {
+        const m = t.date.slice(0, 7);
+        if (!monthMap[m]) monthMap[m] = { income: 0, expense: 0 };
+        monthMap[m][t.type] += t.amount;
+      });
+      const months = Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]));
+      const lastTwo = months.slice(-2);
+      const prevNet = lastTwo[0] ? lastTwo[0][1].income - lastTwo[0][1].expense : 0;
+      const currNet = lastTwo[1] ? lastTwo[1][1].income - lastTwo[1][1].expense : 0;
+      const mom = prevNet ? (((currNet - prevNet) / Math.abs(prevNet)) * 100).toFixed(1) : "0.0";
+      const avgExp = expense.length ? Math.round(totalExp / expense.length) : 0;
+      const ratio = totalExp > 0 ? (totalInc / totalExp).toFixed(2) : "0.00";
+
+      const cards = [
+        { title: "Top Spend Category", value: topCat ? CATEGORIES[topCat[0]].label : "-", desc: topCat ? `${fmt(topCat[1])} - ${pct(topCat[1], totalExp)} of total expenses` : "No data", color: "#f5a623" },
+        { title: "MoM Net Change", value: `${parseFloat(mom) >= 0 ? "+" : ""}${mom}%`, desc: `Savings ${parseFloat(mom) >= 0 ? "improved" : "declined"} from ${fmtK(prevNet)} to ${fmtK(currNet)}`, color: parseFloat(mom) >= 0 ? "#22c55e" : "#ef4444" },
+        { title: "Savings Rate", value: `${sr}%`, desc: parseFloat(sr) >= 30 ? "Excellent - above 30% target" : parseFloat(sr) >= 20 ? "Good - aim for 30%" : "Low - reduce discretionary spend", color: parseFloat(sr) >= 20 ? "#22c55e" : "#f5a623" },
+        { title: "Avg. Expense Size", value: fmtK(avgExp), desc: `Across ${expense.length} expense transactions`, color: "#3b82f6" },
+        { title: "Income / Expense Ratio", value: `${ratio}x`, desc: `For every INR 1 spent you earn INR ${ratio}`, color: totalInc > totalExp ? "#22c55e" : "#ef4444" },
+        { title: "Total Transactions", value: String(state.transactions.length), desc: `${income.length} income - ${expense.length} expense`, color: "#a855f7" }
+      ];
+
+      document.getElementById("insights-page").innerHTML = `
+        <div class="grid-insight">
+          ${cards.map(c => `<div class="card section"><div class="mono" style="font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#4a4946;margin-bottom:10px;">${c.title}</div><div style="font-family:var(--heading);font-size:22px;font-weight:700;color:${c.color};margin-bottom:6px;letter-spacing:-.02em;">${c.value}</div><div class="mono" style="font-size:11px;color:#8b8984;line-height:1.5;">${c.desc}</div></div>`).join("")}
+        </div>
+        <div class="card section">
+          <div class="section-head"><div><h3>Expense Breakdown</h3><p>spend distribution by category</p></div></div>
+          ${sortedCats.slice(0, 7).map(([k, v]) => {
+        const cat = CATEGORIES[k] || CATEGORIES.other;
+        const w = totalExp ? (v / totalExp * 100).toFixed(1) : 0;
+        return `<div class="progress-row"><div class="progress-meta"><span class="mono" style="font-size:11px;color:#8b8984;display:flex;align-items:center;gap:6px;"><span style="color:${cat.color}">${cat.icon}</span>${cat.label}</span><span class="mono" style="font-size:11px;">${fmt(v)} <span class="muted">(${w}%)</span></span></div><div class="bar"><span style="width:${w}%;background:${cat.color};"></span></div></div>`;
+      }).join("")}
+        </div>
+        <div class="card section">
+          <div class="section-head"><div><h3>Net Savings by Month</h3><p>income - expenses trend</p></div></div>
+          <div class="chart-box md"><canvas id="insights-chart"></canvas></div>
+        </div>
+      `;
+
+      destroyChart("insights");
+      state.charts.insights = new Chart(document.getElementById("insights-chart"), {
+        type: "line",
+        data: { labels: TREND.map(t => t.m), datasets: [{ label: "Net Savings", data: TREND.map(t => t.income - t.expense), borderColor: "#f5a623", backgroundColor: "rgba(245,166,35,0.12)", fill: false, tension: 0.35, pointBackgroundColor: "#f5a623" }] },
+        options: chartOptions()
+      });
+    }
+
+    function openModal(id) {
+      if (state.role !== "admin") {
+        toast("Switch to admin to add entries", "NO");
+        return;
+      }
+      const tx = id ? state.transactions.find(t => t.id === id) : null;
+      const root = document.getElementById("modal-root");
+      root.innerHTML = `
+        <div class="modal-backdrop" id="modal-backdrop">
+          <div class="modal">
+            <h3>${tx ? "Edit Transaction" : "New Transaction"}</h3>
+            <div class="field">
+              <label>Description</label>
+              <input id="m-name" value="${escapeAttr(tx?.name || "")}" placeholder="e.g. Monthly Salary" />
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label>Type</label>
+                <select id="m-type">
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Amount (INR)</label>
+                <input id="m-amount" type="number" value="${tx?.amount || ""}" placeholder="0" />
+              </div>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label>Category</label>
+                <select id="m-category">${Object.entries(CATEGORIES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}</select>
+              </div>
+              <div class="field">
+                <label>Date</label>
+                <input id="m-date" type="date" value="${tx?.date || new Date().toISOString().slice(0, 10)}" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Note</label>
+              <input id="m-note" value="${escapeAttr(tx?.note || "")}" placeholder="Optional details" />
+            </div>
+            <div class="modal-actions">
+              <button id="m-cancel" class="btn">Cancel</button>
+              <button id="m-save" class="btn primary">${tx ? "Save Changes" : "Add Transaction"}</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("m-type").value = tx?.type || "expense";
+      document.getElementById("m-category").value = tx?.category || "food";
+      document.getElementById("m-cancel").addEventListener("click", closeModal);
+      document.getElementById("modal-backdrop").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") closeModal(); });
+      document.getElementById("m-save").addEventListener("click", () => {
+        const payload = {
+          id: tx ? tx.id : Date.now(),
+          name: document.getElementById("m-name").value.trim(),
+          type: document.getElementById("m-type").value,
+          category: document.getElementById("m-category").value,
+          amount: parseFloat(document.getElementById("m-amount").value),
+          date: document.getElementById("m-date").value,
+          note: document.getElementById("m-note").value.trim()
+        };
+        if (!payload.name || !payload.amount || !payload.date) return;
+        if (tx) state.transactions = state.transactions.map(t => t.id === tx.id ? payload : t);
+        else state.transactions.unshift(payload);
+        persistAndRender();
+        toast(tx ? "Transaction updated" : "Transaction added", tx ? "ED" : "IN");
+        closeModal();
+      });
+    }
+
+    function closeModal() {
+      document.getElementById("modal-root").innerHTML = "";
+    }
+
+    function persistAndRender() {
+      save("finova_plain_v1", state.transactions);
+      renderAll();
+    }
+
+    function renderAll() {
+      updateSidebarStats();
+      updateRoleUI();
+      renderDashboard();
+      renderTransactions();
+      renderInsights();
+      setPage(state.page);
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function escapeAttr(str) {
+      return escapeHtml(str).replace(/"/g, "&quot;");
+    }
+
+    document.getElementById("page-date").textContent = "FINOVA - " + new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    document.getElementById("role-select").addEventListener("change", (e) => {
+      state.role = e.target.value;
+      save("finova_plain_role_v1", state.role);
+      renderAll();
+      toast(`Switched to ${state.role} mode`, state.role === "admin" ? "AD" : "VW");
+    });
+    document.querySelectorAll(".nav button").forEach(btn => btn.addEventListener("click", () => setPage(btn.dataset.page)));
+    document.getElementById("menu-btn").addEventListener("click", openSidebar);
+    document.getElementById("sidebar-overlay").addEventListener("click", closeSidebar);
+    document.getElementById("new-entry-btn").addEventListener("click", () => openModal());
+    document.getElementById("export-btn").addEventListener("click", () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(state.transactions, null, 2)], { type: "application/json" }));
+      a.download = "finova-export.json";
+      a.click();
+      toast("Exported JSON", "EX");
+    });
+
+    renderAll();
+  </script>
+  </script>
+  </script>
+  </script>
+</body>
+
+</html>
