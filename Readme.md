@@ -127,3 +127,9 @@ Both download instantly from the top bar.
 **Charts:** Recharts with custom tooltips and no default legends (replaced with custom HTML legends for better control).
 
 **Responsiveness:** CSS media queries, collapsible sidebar on mobile (hamburger toggle), responsive grids with `auto-fit`.
+
+
+
+## Live Demo
+
+https://finova-frontend-gaurav.vercel.app/
